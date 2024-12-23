@@ -25,6 +25,10 @@ import matplotlib.ticker as ticker
 import os 
 import csv
 
+from data_handling_functions import get_files, get_timeseries_for_clustering, save_cluster_TS
+from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results
+from map_functions import Cluster_Timeseries
+
 #set matplotlib parameters
 plt.rcParams.update({'font.size': 20,
                      'axes.labelsize': 22,
@@ -68,35 +72,6 @@ for h in range(len(TPs)):
     (clustered_TS, lab) = plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap_name, colors, only_SCN, exclude_BG = exclude_BG)
     save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, n_rows, n_cols, invert, detrend)
 
-#%% Getting timeseries of pre-determined clusters 
-replotting = False
-if replotting==True:
-    #name for new data 
-    name1 ='C2inC1BSL'
-    # Files for reporter to be mapped 
-    TM = 'RBM3_32_dtr' #file prefix for import. note: suffix is _measure.csv
-    (df, n_rows, n_cols, n_rois, n_slices) = get_files(TM)
-    
-    no_k = 6 
-    invert = False # cluster 
-    invert1 = False # to be remapped
-    detrend = False
-    interval = 0.5 #acquisition in hours  
-    exclude_BG=False
-    
-    #Import clusters 
-    name = 'C2-BSL_k6'
-    (biod_res, lab) = import_BioDare_results_finalcluster_ksmall(name, no_k)[:2]
-    
-    T = np.arange(0,(n_slices/(1/interval)),interval)
-    
-    #(df, T, n_slices) = remove_dips(df, T, n_slices) 
-    (TS_list, ts_perslice, X, only_SCN) = get_timeseries_for_clustering(T, df, n_rois, n_slices, no_k, cluster_norm=True, exclude_BG=exclude_BG)
-    clustered_TS = plot_on_existing_Clusters(T, lab, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap_name, colors, only_SCN, exclude_BG = False)
-    save_cluster_TS(name1, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, n_rows, n_cols, invert1, detrend)
-
-#%% Show specific clusters if desired
-#imshow_specific_cluster(lab, cmap)
 
 #%% Post-BioDare analysis 
 """ Data need to be analysed in biodare before running this part 
@@ -125,20 +100,10 @@ for h in range(0,len(names)):
     if adjust == 1: 
         ctdiff=0
     
-    if replotting == False:
-        if new_k == 6: #no reclustering. based on GFP_lab and normal clusters deter2mined in part 1
-            (biod_res, GFP_lab, GFP_clustered_TS) = import_BioDare_results_finalcluster_ksmall(name, new_k)
-            (cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, per_str) = check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype)
-            plot_final_map_k6(T, GFP_clustered_TS, cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, interval, per_str, name)
-            ctdiff = replot_CT(adjust, desired_ct, ctdiff, reclustered_phases_str, phasetype, per_str, GFP_lab_ordered, name)
-            
-    if replotting==True:
+
+    if new_k == 6: #no reclustering. based on GFP_lab and normal clusters deter2mined in part 1
         (biod_res, GFP_lab, GFP_clustered_TS) = import_BioDare_results_finalcluster_ksmall(name, new_k)
-        #import phases and timeseries of replotted reporter
-        (biod_res1, _, GFP_clustered_TS1) = import_BioDare_results_finalcluster_ksmall(name1, new_k)
-        
-        (cmap, labels_ordered, labels_ordered1, reclustered_phases_str, reclustered_phases_str1, GFP_lab_ordered, grand_order, per_str, per_str1) = REPLOT_check_and_format_BioDare_results_finalcluster(biod_res, biod_res1, cmap, invert, invert1, phasetype)
-        
-        replot_final_map_k6(T, GFP_clustered_TS, GFP_clustered_TS1, cmap, labels_ordered, labels_ordered1, reclustered_phases_str, reclustered_phases_str1, GFP_lab_ordered, grand_order, interval, per_str, per_str1)
-        plot_difference(GFP_lab_ordered, reclustered_phases_str,reclustered_phases_str1)
-        ctdiff = replot_CT(adjust, desired_ct, ctdiff, reclustered_phases_str1, phasetype, per_str1, GFP_lab_ordered, name1)
+        (cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, per_str) = check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype)
+        plot_final_map_k6(T, GFP_clustered_TS, cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, interval, per_str, name)
+        ctdiff = replot_CT(adjust, desired_ct, ctdiff, reclustered_phases_str, phasetype, per_str, GFP_lab_ordered, name)
+            
