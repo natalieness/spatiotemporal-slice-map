@@ -25,9 +25,6 @@ from matplotlib.mlab import detrend_linear
 from statsmodels.tsa.tsatools import detrend
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.ticker as ticker
-from plotting_functions import reset_cmap, plot_clustered_ts_results
-from map_functions import get_timeseries_for_clustering, cluster_timeseries
-from data_handling_functions import get_files,  save_cluster_TS
 
 import os 
 import csv
@@ -78,7 +75,7 @@ for h in range(len(TPs)):
     
         
     #perform clustering
-    kmeans = cluster_timeseries(no_k, TS_list)
+    kmeans = Cluster_Timeseries(no_k, TS_list)
     #plot and save results
     (clustered_TS, lab) = plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap_name, colors)
     save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, n_rows, n_cols, invert, detrend)
