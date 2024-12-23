@@ -25,9 +25,9 @@ import matplotlib.ticker as ticker
 import os 
 import csv
 
-from data_handling_functions import get_files, get_timeseries_for_clustering, save_cluster_TS
-from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results
-from map_functions import Cluster_Timeseries
+from data_handling_functions import get_files, get_timeseries_for_clustering, save_cluster_TS, import_BioDare_results_finalcluster_ksmall
+from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results, plot_final_map_k6 
+from map_functions import Cluster_Timeseries, check_and_format_BioDare_results_finalcluster
 
 #set matplotlib parameters
 plt.rcParams.update({'font.size': 20,
