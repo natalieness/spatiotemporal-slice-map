@@ -4,96 +4,99 @@
 Functions to handle data import and export
 
 """
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
-def get_files(TP, dimensions_file='dimensions.csv'):
-    try:
-        df = pd.read_csv(f"{TP}.csv")
-        dimdf = pd.read_csv(dimensions_file)
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"File not found: {e.filename}")
-    
-    try:
-        n_rows = int(dimdf.columns[0])
-        n_cols = int(dimdf.columns[1])
-    except ValueError:
-        raise ValueError("Dimension columns should contain integer values.")
-
-    n_rois = n_rows * n_cols
-    n_slices = df['Slice'].max()
-    
-    rois = np.arange(1, n_rois + 1).tolist() * n_slices
-    if len(rois) != len(df):
-        raise ValueError("Mismatch between number of ROIs and dataframe rows.")
-    
+def get_files(TP):
+    df = pd.read_csv("%s.csv"%TP) 
+    #df = df[~df.Label.str.contains("LeftSCN")]
+    dimdf = pd.read_csv("dimensions.csv")
+    n_rows = int(dimdf.columns[0])
+    n_cols = int(dimdf.columns[1]) 
+    n_rois = n_rows*n_cols
+    n_slices = max(df['Slice'])
+    rois = np.arange(1,n_rois+1)
+    rois = list(rois)
+    rois = rois*n_slices
     df['ROI'] = rois
+    #to exclude certain frames from analysis
+    #df = df.iloc[(n_rois*210):]
+    #n_slices = n_slices-210
+    
+    return (df, n_rows, n_cols, n_rois, n_slices)
 
-    return df, n_rows, n_cols, n_rois, n_slices
-
-def detrend_time_series(X, time_series):
-    for i in range(time_series.shape[0]):
-        TS = time_series[i, :]
-        model = np.polyfit(X, TS, 3)
-        predicted = np.polyval(model, X)
-        time_series[i, :] = TS - predicted
-    return time_series
-
-def invert_time_series(time_series):
-    for i in range(time_series.shape[0]):
-        time_series[i, :] = time_series[i, :] * (-1) + np.amax(time_series[i, :])
-    return time_series
-
-def save_time_series_to_excel(filepath, clustered_TS, time_points):
-    biodare_arr = np.zeros([clustered_TS.shape[0], clustered_TS.shape[1] + 1])
-    biodare_arr[:, 1:] = clustered_TS
-    biodare_arr[:, 0] = np.arange(1, clustered_TS.shape[0] + 1)
-
-    biodare_f = pd.DataFrame(biodare_arr)
-    col_names = [''] + list(time_points)
-    biodare_f.columns = col_names
-    biodare_f.to_excel(filepath, index=False)
-
-def save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, invert=False, detrend=False):
+def save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, n_rows, n_cols, invert, detrend):
     X = X.flatten()
-
-    if detrend:
-        clustered_TS = detrend_time_series(X, clustered_TS)
-
-    if clustered_TS.shape[0] < 2:
-        raise ValueError("Clustered time series array has less than 2 rows, cannot plot the second row.")
+    if detrend == True:
+        for i in range(clustered_TS.shape[0]):
+            TS = clustered_TS[i,:]
+            model = np.polyfit(X, TS, 3)
+            predicted = np.polyval(model, X)
+            dtr = TS-predicted
+            clustered_TS[i,:] = dtr
 
     plt.figure()
-    plt.plot(np.arange(clustered_TS.shape[1]), clustered_TS[1, :])
+    plt.plot(np.arange(0,n_slices), clustered_TS[1,:])
 
-    save_time_series_to_excel(f'{name}_TS.xlsx', clustered_TS, T)
-    np.savez_compressed(f'{name}_clusterdata.npz', lab=lab, clustered_TS=clustered_TS, ts_perslice=ts_perslice)
+    biodare_arr = np.zeros([no_k,n_slices+1])
+    biodare_arr[:,1:] = clustered_TS
+    biodare_arr[:,0] = np.arange(1, no_k+1)
 
-    if invert:
-        clustered_TS = invert_time_series(clustered_TS)
-        if detrend:
-            clustered_TS = detrend_time_series(X, clustered_TS)
+    biodare_f = pd.DataFrame(biodare_arr) 
 
-        plt.figure()
-        plt.plot(np.arange(clustered_TS.shape[1]), clustered_TS[1, :])
+    col_names = list(T) #frame time /2 and 0.5 for 30min
+    col_names.insert(0,'')
+    biodare_f.columns = col_names
+
+    filepath = '%s_TS.xlsx'%name
+    biodare_f.to_excel(filepath, index=False)
+    np.savez_compressed('%s_clusterdata.npz'%name, lab = lab, clustered_TS = clustered_TS, ts_perslice = ts_perslice)
+
+    if invert == True:
+        for i in range(clustered_TS.shape[0]):
+            inverted_series = clustered_TS[i,:]*(-1) + np.amax(clustered_TS[i,:])
+            clustered_TS[i,:] = inverted_series
+            
+    X = X.flatten()
+    if detrend == True:
+        for i in range(clustered_TS.shape[0]):
+            TS = clustered_TS[i,:]
+            model = np.polyfit(X, TS, 3)
+            predicted = np.polyval(model, X)
+            dtr = TS-predicted
+            clustered_TS[i,:] = dtr
+
+    plt.figure()
+    plt.plot(np.arange(0,n_slices), clustered_TS[1,:])
+
+    biodare_arr = np.zeros([no_k,n_slices+1])
+    biodare_arr[:,1:] = clustered_TS
+    biodare_arr[:,0] = np.arange(1, no_k+1)
+
+    biodare_f = pd.DataFrame(biodare_arr) 
+
+    col_names = list(T) 
+    col_names.insert(0,'')
+    biodare_f.columns = col_names
+
+    if invert == True:
+        filepath = '%s_TS_inv.xlsx'%name
+        biodare_f.to_excel(filepath, index=False)
+        np.savez_compressed('%s_clusterdata_inv.npz'%name, lab = lab, clustered_TS = clustered_TS, ts_perslice = ts_perslice)
         
-        save_time_series_to_excel(f'{name}_TS_inv.xlsx', clustered_TS, T)
-        np.savez_compressed(f'{name}_clusterdata_inv.npz', lab=lab, clustered_TS=clustered_TS, ts_perslice=ts_perslice)
+        
 
 def import_BioDare_results_finalcluster_ksmall(name, new_k):
-    try:
-        biod_res = pd.read_csv(f'{name}_BioDare.csv', skiprows=range(0, 22), on_bad_lines='skip')
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"File not found: {e.filename}")
+    biod_res = pd.read_csv('%s_BioDare.csv'%name, skiprows = range(0, 22),error_bad_lines=False)
+    
+    biod_res = biod_res.iloc[:new_k,:]
 
-    biod_res = biod_res.iloc[:new_k, :]
-
-    with np.load(f'{name}_clusterdata.npz') as data:
+    # get npy files 
+    with np.load('%s_clusterdata.npz'%name) as data:
         print(data.files)
         GFP_lab = data['lab']
-        GFP_clustered_TS = data['clustered_TS'][:, :]
+        GFP_clustered_TS = data['clustered_TS'][:,:]
+            
+        print(len(GFP_clustered_TS[1,:]))
         
-        print(len(GFP_clustered_TS[1, :]))
+    return (biod_res, GFP_lab, GFP_clustered_TS) 
 
-    return biod_res, GFP_lab, GFP_clustered_TS
+
