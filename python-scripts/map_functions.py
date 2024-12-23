@@ -5,238 +5,172 @@ Functions for data processing and mapping
 """
 
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-from matplotlib.colors import LinearSegmentedColormap
-
-
-def plot_avg_groupby_pd(df: pd.DataFrame) -> np.ndarray:
-    """
-    Plot the average of 'Mean' values grouped by 'ROI' and return the averaged array.
-
-    Parameters:
-    df (pd.DataFrame): DataFrame containing 'ROI' and 'Mean' columns.
-
-    Returns:
-    np.ndarray: Averaged array of 'Mean' values.
-    """
-    grouped_means = df.groupby('ROI')['Mean'].apply(list).values
-    mean_matrix = np.vstack(grouped_means)
-    avg_means = mean_matrix.mean(axis=0)
-    
-    plt.plot(np.arange(len(avg_means)), avg_means)
+def plot_avg_groupby_pd(df):
+    a = np.array(df.groupby('ROI')['Mean'])
+    arr = np.zeros([a[0,1].shape[0], a.shape[0]])
+    for h in range(a.shape[0]):
+        arr[:,h] = a[h,1][:]
+    arr_m = np.mean(arr, axis=1)
+    #plot mean trace 
+    plt.plot(np.arange(0,arr_m.shape[0]), arr_m)
     plt.show()
     
-    return avg_means
+    return arr_m
 
 
-def get_timeseries_for_clustering(T: np.ndarray, df: pd.DataFrame, n_rois: int, n_slices: int, cluster_norm: bool = True):
-    """
-    Prepare timeseries data for clustering.
-
-    Parameters:
-    T (np.ndarray): Array of time points.
-    df (pd.DataFrame): DataFrame containing 'ROI' and 'Mean' columns.
-    n_rois (int): Number of ROIs.
-    n_slices (int): Number of slices.
-    cluster_norm (bool): Flag to determine if normalization should be applied.
-
-    Returns:
-    tuple: Timeseries list, timeseries per slice, and reshaped time points.
-    """
-    X = T.reshape(-1, 1)
+def get_timeseries_for_clustering(T, df, n_rois, n_slices, no_k, cluster_norm=True):
+    # set up X values 
+    X = np.array(T)
+    X = X.reshape(-1,1)
     
+    #normalisation
     TS_list = []
     TS_list_norm = []
     
-    for roi in range(1, n_rois + 1):
-        means = df[df['ROI'] == roi]['Mean'].values
-        means_range = means.max() - means.min()
+    #exclude background clusters 
+    #exclude ROIs here based on the standard deviation of the timeseries
+    
+    for i in range(1,n_rois+1):
+        means = df[df['ROI'] == i]['Mean']
+        means_max = np.amax(means)
+        means_min = np.amin(means)
+        means_range = means_max - np.amin(means)
         if means_range > 0:
-            means_norm = (means - means.min()) / means_range
-        else:
-            means_norm = means - means.max()
-        
-        if cluster_norm:
+            means_norm = [(i - means_min)/means_range for i in means]
+        elif means_range == 0:
+            means_norm = [i-means_max for i in means]
+        means_nonnorm = [i for i in means]
+        if cluster_norm == True:
             TS_list.append(means_norm)
+        elif cluster_norm == False:
+            TS_list.append(means_nonnorm)
         else:
-            TS_list.append(means)
-        
+            print('Error')
         TS_list_norm.append(means_norm)
     
-    ts_perslice = np.array(TS_list_norm).T.tolist()
-    
-    return TS_list, ts_perslice, X
 
 
-def cluster_timeseries(no_k: int, TS_list: list) -> KMeans:
-    """
-    Perform KMeans clustering on the timeseries data.
+    ts_perslice = []
+    for k in range(n_slices):
+        ts_ = []
+        for k_ in range(len(TS_list)):
+            ts_.append(TS_list_norm[k_][k])
+        ts_perslice.append(ts_)
+        
+    return (TS_list, ts_perslice, X)
 
-    Parameters:
-    no_k (int): Number of clusters.
-    TS_list (list): List of timeseries data.
-
-    Returns:
-    KMeans: Fitted KMeans object.
-    """
-    kmeans = KMeans(n_clusters=no_k, init='random', algorithm='full').fit(TS_list)
+def Cluster_Timeseries(no_k, TS_list):
+    #KMeans clustering
+    kmeans = KMeans(n_clusters=no_k, init = 'random', random_state=None, algorithm='full').fit(TS_list)
+    #full is lloyd in newer versions
     return kmeans
 
-
-def find_non_rhythmic_regions(biod_res: pd.DataFrame, pos_av: list) -> list:
-    """
-    Find non-rhythmic regions in the BioDare dataset.
-
-    Parameters:
-    biod_res (pd.DataFrame): BioDare results DataFrame.
-    pos_av (list): List of available positions.
-
-    Returns:
-    list: List of non-rhythmic regions.
-    """
-    return [i for i in pos_av if 'IGNORED' in str(biod_res['Status'][i])]
-
-
-def calculate_period(biod_res: pd.DataFrame, pos_av: list) -> float:
-    """
-    Calculate the average period.
-
-    Parameters:
-    biod_res (pd.DataFrame): BioDare results DataFrame.
-    pos_av (list): List of available positions.
-
-    Returns:
-    float: Average period.
-    """
+def check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype):
     
-    period = biod_res['Period'][pos_av].mean()
-
-    return period
-
-
-def recluster_phases(biod_res: pd.DataFrame, pos_av: list, period: float, invert: bool, phasetype: str) -> list:
-    """
-    Recluster the phases based on the BioDare results.
-
-    Parameters:
-    biod_res (pd.DataFrame): BioDare results DataFrame.
-    pos_av (list): List of available positions.
-    period (float): Average period.
-    invert (bool): Flag to determine if inversion is needed.
-    phasetype (str): Type of phase to consider.
-
-    Returns:
-    list: Reclustered phases.
-    """
-    reclustered_phases = []
-    for i in pos_av:
-        phase = float(biod_res[phasetype][i])
-        if invert and not np.isnan(phase):
-            phase -= period / 2
-            if phase < 0:
-                phase += 24
-        reclustered_phases.append(round((phase - np.floor(phase)) * 0.6 + np.floor(phase), 2))
-    return reclustered_phases
-
-
-def create_grand_order(pos_BG: int, NR: list, pos_av: list, reclustered_phases: list) -> list:
-    """
-    Create the grand order of clusters.
-
-    Parameters:
-    pos_BG (int): Background position.
-    NR (list): List of non-rhythmic regions.
-    pos_av (list): List of available positions.
-    reclustered_phases (list): Reclustered phases.
-
-    Returns:
-    list: Grand order of clusters.
-    """
-    grand_order = [pos_BG] + NR + pos_av
-    if len(reclustered_phases) > 1:
-        reclustered_phases_O = np.argsort(reclustered_phases)
-        correct_order = int(input('Is the order of phases correct? Answer 1 if yes, 0 if no '))
-        if not correct_order:
-            new_order = list(map(int, input("Please enter correct order of ROIs, with no spaces or commas. Example: 012345. ")))
-        else:
-            new_order = reclustered_phases_O
-        grand_order = [pos_BG] + NR + list(np.array(pos_av)[new_order])
-    return grand_order
-
-
-def generate_ordered_labels(grand_order: list, GFP_lab: np.ndarray, biod_res: pd.DataFrame, pos_av: list, NR: list, reclustered_phases: list, pers: list, n_nan: int) -> tuple:
-    """
-    Generate ordered labels and period strings.
-
-    Parameters:
-    grand_order (list): Grand order of clusters.
-    GFP_lab (np.ndarray): Array of GFP labels.
-    biod_res (pd.DataFrame): BioDare results DataFrame.
-    pos_av (list): List of available positions.
-    NR (list): List of non-rhythmic regions.
-    reclustered_phases (list): Reclustered phases.
-    pers (list): List of periods.
-    n_nan (int): Number of non-rhythmic clusters.
-
-    Returns:
-    tuple: Ordered labels, reclustered phases strings, GFP lab ordered, and period strings.
-    """
-    GFP_lab_ordered = np.zeros_like(GFP_lab)
-    labels_ordered = ['NR'] + ['NR'] * len(NR) + reclustered_phases
-    pers_labels_ordered = ['NR'] + ['NR'] * len(NR) + pers
-
-    for e, i in enumerate(grand_order):
-        idx = np.where(GFP_lab == i)
-        GFP_lab_ordered[idx] = e
-
-    reclustered_phases_str = [f'{i:.2f}' if e >= n_nan else i for e, i in enumerate(labels_ordered)]
-    pers_str = [f'{i:.2f}' if e >= n_nan else i for e, i in enumerate(pers_labels_ordered)]
-    
-    return labels_ordered, reclustered_phases_str, GFP_lab_ordered, pers_str
-
-
-def check_and_format_BioDare_results_finalcluster(
-    biod_res: pd.DataFrame, pos_av: list, pos_BG: int, cmap: LinearSegmentedColormap, invert: bool, phasetype: str
-) -> tuple:
-    """
-    Check and format BioDare results for final clustering.
-
-    Parameters:
-    biod_res (pd.DataFrame): BioDare results DataFrame.
-    pos_av (list): List of available positions.
-    pos_BG (int): Background position.
-    cmap (LinearSegmentedColormap): Colormap.
-    invert (bool): Flag to determine if inversion is needed.
-    phasetype (str): Type of phase to consider.
-
-    Returns:
-    tuple: Updated colormap, ordered labels, reclustered phases, GFP lab ordered, grand order, and period strings.
-    """
     print(biod_res[phasetype])
     
-    NR = find_non_rhythmic_regions(biod_res, pos_av)
+    #find non-rhythmic regions - ignored in biodare dataset
+    NR = []
+    for i in pos_av:
+        if 'IGNORED' in str(biod_res['Status'][i]):
+            NR.append(i)
+    
+    #update ignored regions 
     pos_av = [x for x in pos_av if x not in NR]
-    n_nan = 6 - len(pos_av)
+    #get number of non-rhythmic clusters in total incl bg 
+    n_nan = 6-len(pos_av)
+        
+    #get average period if traces need inversion
+    if invert == True:
+        period = float(biod_res['Period'][pos_av].mean())
+        print("Period: %f"%period)
     
-    period = calculate_period(biod_res, pos_av)
-    reclustered_phases = recluster_phases(biod_res, pos_av, period, invert, phasetype)
-    pers = [round((float(biod_res['Period'][i]) - np.floor(float(biod_res['Period'][i]))) * 0.6 + np.floor(float(biod_res['Period'][i])), 2) for i in pos_av]
+    #get list of detected phases 
+    reclustered_phases = []
+    for i in pos_av:
+        a = float(biod_res[phasetype][i])
+        if (invert == True) & (np.isnan(biod_res[phasetype][i]) == False):
+            a = a-(period/2)
+            if a <0:
+                a = a+24
+        b = np.floor(a)
+        c = (a-b)*0.6+b
+        d = round(c,2)
+        reclustered_phases.append(d)
+        
+    #repeat for period 
+    pers = []
+    for i in pos_av:
+        a = float(biod_res['Period'][i])
+        b = np.floor(a)
+        c = (a-b)*0.6+b
+        d = round(c,2)
+        pers.append(d)
     
-    grand_order = create_grand_order(pos_BG, NR, pos_av, reclustered_phases)
-    labels_ordered, reclustered_phases_str, GFP_lab_ordered, pers_str = generate_ordered_labels(grand_order, GFP_lab, biod_res, pos_av, NR, reclustered_phases, pers, n_nan)
+    #initiate list to keep track of orders
+    grand_order = list(np.arange(6))
+    grand_order = [pos_BG] + NR + pos_av
     
-    if n_nan > 1:
-        white = (0.7, 0.7, 0.7, 1.0)
-        colors = [(0.0, 0.0, 0.0, 1.0), (0.0, 0.0, 0.8, 1.0), (0.46875, 0.0, 1.0, 1.0), (1.0, 0.36, 0.64, 1.0), (1.0, 0.76, 0.24, 1.0)]
-        colorsn = [colors[0]] + [white] * (n_nan - 1) + colors[-(6 - n_nan):]
-        if n_nan == 6:
-            colorsn = [colors[0]] + [white] * (n_nan - 1)
-        cmap = LinearSegmentedColormap.from_list('gnuplot_nowhite', colorsn, N=6)
+    #sort through rhythmic clusters 
+    if len(reclustered_phases) > 1:
+        reclustered_phases_O = list(np.argsort(reclustered_phases))
+        print('Original positions:')
+        for g in range(len(reclustered_phases)):
+            print(g, reclustered_phases[g] )
+        print('New order:', np.array(reclustered_phases)[reclustered_phases_O])
     
-    return cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, pers_str
+        correct_order = int(input('Is the order of phases correct? Answer 1 if yes, 0 if no '))
+        if correct_order == False: 
+            new_order = input("Please enter correct order of ROIs, with no spaces or commas. Example: 012345. ")
+            new_order = list(map(int,new_order))
+
+        else:
+            new_order = reclustered_phases_O
+    
+        grand_order = [pos_BG] + NR + list(np.array(pos_av)[new_order])
+        labels_ordered = ['NR'] + ['NR']*len(NR) + list(np.array(reclustered_phases)[new_order])
+        pers_labels_ordered = ['NR'] + ['NR']*len(NR) + list(np.array(pers)[new_order])
+    else:
+        grand_order = [pos_BG] + NR + pos_av
+        labels_ordered = ['NR'] + ['NR']*len(NR) + reclustered_phases
+        pers_labels_ordered = ['NR'] + ['NR']*len(NR) + pers
+
+        
+    #initiate ordered lists and map
+    GFP_lab_ordered = np.zeros(GFP_lab.shape)
+    reclustered_phases_ordered = []
+    pers_ordered=[]
+    
+    #order rhythmic clusters and assign label to map 
+    for e,i in enumerate(grand_order):
+        idx = np.where(GFP_lab == i)
+        GFP_lab_ordered[idx] = e
+        reclustered_phases_ordered.append(labels_ordered[e])
+        pers_ordered.append(pers_labels_ordered[e])
+    
+
+    reclustered_phases_str = ['%.2f'%i  if e>(n_nan-1) else i for e,i in enumerate(reclustered_phases_ordered)]
+    per_str = ['%.2f'%i  if e>(n_nan-1) else i for e,i in enumerate(pers_ordered)]
+    #stop indent
+        
+    if n_nan > 1: 
+        print('entered multi-non rhythmic loop')
+        white = (0.7, 0.7, 0.7,1.0)
+        n_c = -(6-n_nan) #number of normal color clusters, negative to use as index
+        colors = [(0.0, 0.0, 0.0, 1.0),(0.0, 0.0, 0.8, 1.0),(0.46875, 0.0, 1.0, 1.0),(1.0, 0.3600000000000002, 0.6399999999999999, 1.0),(1.0, 0.7600000000000001, 0.24, 1.0)]  
+        colorsn = [*list([colors[0]]), *list([white]*(n_nan-1)), *list(colors[n_c:])]
+        if n_nan ==6:
+            colorsn = [*list([colors[0]]), *list([white]*(n_nan-1))]
+        n_bin = 6  # Discretizes the interpolation into bins
+        cmap_name = 'gnuplot_nowhite'
+        cmap = LinearSegmentedColormap.from_list(cmap_name, colorsn, N=n_bin)
+    else:
+        cmap=cmap
+    
+    return (cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, per_str)
+
+
+
 
 
 
