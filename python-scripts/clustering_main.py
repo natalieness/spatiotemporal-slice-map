@@ -29,9 +29,9 @@ import matplotlib.ticker as ticker
 import os 
 import csv
 
-from data_handling_functions import get_files, get_timeseries_for_clustering
+from data_handling_functions import get_files, get_timeseries_for_clustering, save_cluster_TS
 from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results
-from map_functions import Cluster_Timeseries, save_cluster_TS
+from map_functions import Cluster_Timeseries
 
 
 #set matplotlib parameters
