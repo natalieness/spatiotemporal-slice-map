@@ -36,9 +36,7 @@ def reset_cmap():
 def save_fig(fig, name):
     fig.savefig('%s.svg'%(name), format='svg', bbox_inches='tight')
     
-def plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap_name, colors):
-    #prep colormap
-    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=no_k)
+def plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap):
 
     lab = kmeans.labels_
     
@@ -146,11 +144,11 @@ def plot_final_map_k6(T, GFP_clustered_TS, cmap, labels_ordered, reclustered_pha
         fig = plt.figure(figsize=(8,5))
         ax = plt.subplot(111)
         
-        for e,i in enumerate(grand_order):
+        for e,i in enumerate(grand_order[1:]):
             if lindtr==True:
-                ax.plot(T[:n_X], detrend_linear(GFP_clustered_TS[i,(SP):(EP)]), color=cmap(e), linewidth=3)
+                ax.plot(T[:n_X], detrend_linear(GFP_clustered_TS[i,(SP):(EP)]), color=cmap(e+1), linewidth=3)
             else:
-                ax.plot(T[:n_X], GFP_clustered_TS[i,(SP):(EP)], color=cmap(e), linewidth=3)
+                ax.plot(T[:n_X], GFP_clustered_TS[i,(SP):(EP)], color=cmap(e+1), linewidth=3)
         
         
         ax.set_ylabel('Normalized \n fluorescence (A.U.)', fontsize=40)

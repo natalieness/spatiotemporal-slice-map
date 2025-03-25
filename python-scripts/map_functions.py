@@ -3,7 +3,10 @@
 Functions for data processing and mapping 
 
 """
-
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from matplotlib.colors import LinearSegmentedColormap
 
 def plot_avg_groupby_pd(df):
     a = np.array(df.groupby('ROI')['Mean'])
@@ -61,14 +64,38 @@ def get_timeseries_for_clustering(T, df, n_rois, n_slices, no_k, cluster_norm=Tr
 
 def Cluster_Timeseries(no_k, TS_list):
     #KMeans clustering
-    kmeans = KMeans(n_clusters=no_k, init = 'random', random_state=None, algorithm='full').fit(TS_list)
+    kmeans = KMeans(n_clusters=no_k, init = 'random', random_state=None, algorithm='lloyd').fit(TS_list)
     #full is lloyd in newer versions
     return kmeans
 
-def check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype):
+def check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype, GFP_lab):
     
     print(biod_res[phasetype])
     
+    #find background cluster 
+    bg_found = False
+    for i in range(len(biod_res[phasetype])):
+        if 'FAILED' in str(biod_res['Status'][i]):
+            pos_BG = i
+            bg_found = True
+    if bg_found == False:
+        c_ignored = 0 
+        for i in range(len(biod_res[phasetype])):
+            if 'IGNORED' in str(biod_res['Status'][i]):
+                c_ignored += 1
+        if c_ignored == 1: 
+            for i in range(len(biod_res[phasetype])):
+                if 'IGNORED' in str(biod_res['Status'][i]):
+                    pos_BG=i
+                    bg_found = True
+    if bg_found == False:
+        #if no clusters failed period estimation, assume lowest amplitude
+        pos_BG = biod_res['Amplitude'].argmin()
+    
+    #positions excluding bg 
+    pos_av = [x for x in list(np.arange(6)) if x != pos_BG ]
+
+
     #find non-rhythmic regions - ignored in biodare dataset
     NR = []
     for i in pos_av:

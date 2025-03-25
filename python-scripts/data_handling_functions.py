@@ -5,6 +5,10 @@ Functions to handle data import and export
 
 """
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
 def get_files(TP):
     df = pd.read_csv("%s.csv"%TP) 
     #df = df[~df.Label.str.contains("LeftSCN")]
@@ -85,7 +89,7 @@ def save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, 
         
 
 def import_BioDare_results_finalcluster_ksmall(name, new_k):
-    biod_res = pd.read_csv('%s_BioDare.csv'%name, skiprows = range(0, 22),error_bad_lines=False)
+    biod_res = pd.read_csv('%s_BioDare.csv'%name, skiprows = range(0, 22),on_bad_lines='skip')
     
     biod_res = biod_res.iloc[:new_k,:]
 

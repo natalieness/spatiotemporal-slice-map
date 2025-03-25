@@ -28,9 +28,10 @@ import matplotlib.ticker as ticker
 
 import os 
 import csv
+import sys
 
 from data_handling_functions import get_files, import_BioDare_results_finalcluster_ksmall
-from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results, plot_final_map_k6, 
+from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results, plot_final_map_k6
 from map_functions import check_and_format_BioDare_results_finalcluster
 
 #set matplotlib parameters
@@ -47,9 +48,9 @@ cmap = reset_cmap() #reset colormap
 phasetype = 'Abs Phase To Zero'
 
 #filenames of time series data extracted from ImageJ , 1 per sample.
-TPs = ['example_ts1','example_ts2'] #csv suffix not needed
+TPs = ['example_ts2'] #csv suffix not needed
 #Names of files for saving 
-names = ['Example_1','Example_2']
+names = ['Example_2']
 #whether to invert the time series before clustering
 inverts = [False,False]
 
@@ -60,6 +61,20 @@ interval = 0.5 #acquisition in hours
 
 
 TP = TPs[0] 
+
+#check if file exists 
+if not os.path.isfile('%s.csv'%TP):
+    #navigate to subdirectory if needed
+    os.chdir('example_data_plot')
+
+    # Verify the current working directory
+    print("Current Directory:", os.getcwd())
+    
+    #check if file exists in subdirectory
+    if not os.path.isfile('%s.csv'%TP):
+        print('File not found. Check the filename and path.')
+        sys.exit()
+
 (df, n_rows, n_cols, n_rois, n_slices) = get_files(TP)
 T = np.arange(0,(n_slices/(1/interval)),interval)
 
@@ -70,5 +85,5 @@ for h in range(0,len(names)):
     invert=inverts[h]
 
     (biod_res, GFP_lab, GFP_clustered_TS) = import_BioDare_results_finalcluster_ksmall(name, 6)
-    (cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, per_str) = check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype)
+    (cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, per_str) = check_and_format_BioDare_results_finalcluster(biod_res, cmap, invert, phasetype, GFP_lab)
     plot_final_map_k6(T, GFP_clustered_TS, cmap, labels_ordered, reclustered_phases_str, GFP_lab_ordered, grand_order, interval, per_str, name)

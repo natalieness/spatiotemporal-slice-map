@@ -27,11 +27,12 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.ticker as ticker
 
 import os 
+import sys
 import csv
 
-from data_handling_functions import get_files, get_timeseries_for_clustering, save_cluster_TS
+from data_handling_functions import get_files,  save_cluster_TS
 from plotting_functions import reset_cmap, save_fig, plot_clustered_ts_results
-from map_functions import Cluster_Timeseries
+from map_functions import Cluster_Timeseries, get_timeseries_for_clustering
 
 
 #set matplotlib parameters
@@ -40,6 +41,7 @@ plt.rcParams.update({'font.size': 20,
                      'axes.linewidth': 1,
                      'xtick.major.size': 10,
                      'ytick.major.size': 10})
+
 
 #%% Data import and basic parameters and clustering 
 
@@ -66,6 +68,20 @@ cmap = reset_cmap() #get or reset colormap
 #iterate through samples 
 for h in range(len(TPs)):
     TP = TPs[h] #get filename for import of sample
+
+    #check if file exists 
+    if not os.path.isfile('%s.csv'%TP):
+        #navigate to subdirectory if needed
+        os.chdir('example_data')
+
+        # Verify the current working directory
+        print("Current Directory:", os.getcwd())
+        
+        #check if file exists in subdirectory
+        if not os.path.isfile('%s.csv'%TP):
+            print('File not found. Check the filename and path.')
+            sys.exit()
+
     name = names[h] #name for saving
     invert = inverts[h] 
 
@@ -81,5 +97,5 @@ for h in range(len(TPs)):
     #perform clustering
     kmeans = Cluster_Timeseries(no_k, TS_list)
     #plot and save results
-    (clustered_TS, lab) = plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap_name, colors)
+    (clustered_TS, lab) = plot_clustered_ts_results(T, kmeans, no_k, n_rows, n_cols, n_slices, ts_perslice, cmap)
     save_cluster_TS(name, X, T, lab, ts_perslice, clustered_TS, no_k, n_slices, n_rows, n_cols, invert, detrend)
